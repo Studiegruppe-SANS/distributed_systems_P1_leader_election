@@ -1,0 +1,29 @@
+# StatefulSet: koerer N kopier af imaget med faste navne bully-0 ... bully-(N-1).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: bully
+spec:
+  serviceName: bully              # knytter poddene til den headless service
+  replicas: 5                     # antal noder (husk ogsaa CLUSTER_SIZE nedenfor)
+  podManagementPolicy: Parallel   # start alle pods samtidig i stedet for en ad gangen
+  selector:
+    matchLabels:
+      app: bully
+  template:
+    metadata:
+      labels:
+        app: bully
+    spec:
+      terminationGracePeriodSeconds: 2   # luk hurtigt ned ved delete/scale
+      containers:
+        - name: bully
+          image: bully-app:latest
+          imagePullPolicy: Never         # brug det lokalt byggede image, hent intet
+          ports:
+            - containerPort: 8080
+          env:
+            - name: CLUSTER_SIZE
+              value: "5"
+            - name: SERVICE_NAME
+              value: "bully"

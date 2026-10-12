@@ -1,0 +1,14 @@
+# Headless service: ingen load balancer (clusterIP: None).
+# Den giver i stedet hver pod et fast DNS-navn: bully-0.bully, bully-1.bully, ...
+apiVersion: v1
+kind: Service
+metadata:
+  name: bully
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true   # DNS-navnet findes saa snart poden har en IP
+  selector:
+    app: bully
+  ports:
+    - name: http
+      port: 8080
