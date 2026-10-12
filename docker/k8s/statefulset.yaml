@@ -27,3 +27,5 @@ spec:
               value: "5"
             - name: SERVICE_NAME
               value: "bully"
+            - name: ALGORITHM
+              value: "improved"

@@ -22,6 +22,12 @@ import time
 from aiohttp import ClientSession, ClientTimeout, web
 
 from bully_node import BullyNode, Message, MsgType
+from improved_bully_node import ImprovedBullyNode
+
+# Vælg algoritme på baggrund af "classic" og "improved"
+ALGORITHMS = {"classic": BullyNode, "improved": ImprovedBullyNode}
+ALGORITHM = os.environ.get{"ALGORITHM", "classic"}
+NodeClass = ALGORITHMS[ALGORITHM]
 
 # ----------------------------------------------------------------------
 # Konfiguration (saettes som miljoevariabler i statefulset.yaml)
@@ -124,7 +130,7 @@ async def tick_loop(app: web.Application) -> None:
 async def lifecycle(app: web.Application):
     app["session"] = ClientSession(timeout=ClientTimeout(total=1))
     app["tasks"] = set()
-    app["node"] = BullyNode(NODE_ID, range(CLUSTER_SIZE), send=make_send(app), log=log)
+    app["node"] = NodeClass(NODE_ID, range(CLUSTER_SIZE), send=make_send(app), log=log)
     loop_task = asyncio.create_task(tick_loop(app))
     yield                                 # her koerer serveren
     loop_task.cancel()
