@@ -4,7 +4,8 @@ app.py — runner der pakker BullyNode ind i en HTTP-server (aiohttp).
 Hver pod koerer denne fil. Den goer tre ting:
   1. Modtager beskeder fra andre pods paa  POST /message  og giver dem til node.on_message()
   2. Kalder node.tick() hvert 100 ms (timeouts og heartbeats)
-  3. Sender beskeder til andre pods som HTTP POST (send-funktionen BullyNode faar)
+  3. 
+  er beskeder til andre pods som HTTP POST (send-funktionen BullyNode faar)
 
 ID og adresser:
   En StatefulSet giver poddene navnene bully-0, bully-1, ... Tallet bruges som ID.
