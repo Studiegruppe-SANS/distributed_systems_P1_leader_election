@@ -25,4 +25,4 @@ As an overall assessment of the Bully Election algorithms, a brief comparison wi
 [A] You can find already existing material regarding both the original Bully Election algorithm and improvements on the internet. You are welcome to use this material as long as you do proper referencing.
 
 ## References
-[1] Hector Garcia-Molina. “Elections in a Distributed Computing System”. In: IEEE Transactions on Computers C-31.1 (1982), pp. 48–59.
+[1] Hector Garcia-Molina. “Elections in a Distributed Computing System”. In: IEEE Transactions on Computers C-31.1 (1982), pp. 48–59 :)
