@@ -7,7 +7,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir aiohttp==3.10.11
 
 # Jeres kode
-COPY bully_node.py app.py ./
+COPY bully_node.py improved_bully_node.py app.py ./
 
 # Print med det samme i stedet for at buffere (ellers ser kubectl logs ingenting)
 ENV PYTHONUNBUFFERED=1
