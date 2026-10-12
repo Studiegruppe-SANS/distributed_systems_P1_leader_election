@@ -26,7 +26,7 @@ from improved_bully_node import ImprovedBullyNode
 
 # Vælg algoritme på baggrund af "classic" og "improved"
 ALGORITHMS = {"classic": BullyNode, "improved": ImprovedBullyNode}
-ALGORITHM = os.environ.get{"ALGORITHM", "classic"}
+ALGORITHM = os.environ.get("ALGORITHM", "classic")
 NodeClass = ALGORITHMS[ALGORITHM]
 
 # ----------------------------------------------------------------------
@@ -146,7 +146,7 @@ def main() -> None:
         web.post("/election", handle_start_election),
     ])
     app.cleanup_ctx.append(lifecycle)
-    log(f"Node {NODE_ID} starter (cluster size {CLUSTER_SIZE}, port {PORT})")
+    log(f"Node {NODE_ID} starter ({ALGORITHM}, cluster size {CLUSTER_SIZE}, port {PORT})")
     web.run_app(app, port=PORT, print=None)
 
 

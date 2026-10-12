@@ -9,7 +9,7 @@ class ImprovedBullyNode(BullyNode):
 
 
     def start_election(self) -> None:
-        # ... your setup here ...
+        self._candidates.clear()
         super().start_election()
 
     # Replace completely: super() is never called
@@ -23,7 +23,6 @@ class ImprovedBullyNode(BullyNode):
             
     def find_winner(self):
         winner = max(self._candidates)
-        self._candidates.clear()
         return winner
 
     # Partly replace: handle your case, pass everything else to the original
@@ -33,6 +32,7 @@ class ImprovedBullyNode(BullyNode):
         if self.state == State.WAITING and now >= self._deadline:  # your case
             winner = self.find_winner()
             self._announce_coordinator(winner)
+            self.coordinator_id = winner
             self.state = State.NORMAL
             self._last_heartbeat = self.clock()
             self._deadline = None
@@ -41,6 +41,8 @@ class ImprovedBullyNode(BullyNode):
 
     def _on_coordinator(self, msg: Message) -> None:
         if msg.coordinator_id == self.id:
+            if self.is_coordinator and self.state == State.NORMAL:
+                return
             self.declare_victory()
         else: 
             super()._on_coordinator(msg)
@@ -49,6 +51,7 @@ class ImprovedBullyNode(BullyNode):
     def _on_election(self, msg: Message) -> None:
         if msg.sender_id < self.id:
             self._send(msg.sender_id, MsgType.OK)
+            self._last_heartbeat = self.clock()
 
     # New method that doesn't exist in BullyNode
     def _announce_coordinator(self, winner: int) -> None:
