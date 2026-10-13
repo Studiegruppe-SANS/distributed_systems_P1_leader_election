@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from bully_node import BullyNode, Message, MsgType, State
 
+# import random # bruges til den ene løsning med self.t i __init__
+from dataclasses import replace
+
 class ImprovedBullyNode(BullyNode):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._candidates: list[int] = []  # resterende kandidater, hoejeste foerst
-
+        # self.t = replace(self.t, heartbeat_timeout=self.t.heartbeat_timeout + random.uniform(0, 2.0)) - # random bruges her mellem 0 og 2
+        self.t = replace(self.t, heartbeat_timeout=self.t.heartbeat_timeout + self.id * 0.5) # hver ny får + 0,5 sek timeout - antager at det er nok til election
 
     def start_election(self) -> None:
+        # undgå valg midt i et andet valg, så candidates bliver tømt
+        if self.state in (State.ELECTION, State.WAITING):
+            return
         self._candidates.clear()
         super().start_election()
 
