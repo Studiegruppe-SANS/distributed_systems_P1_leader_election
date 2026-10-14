@@ -65,6 +65,10 @@ class Timeouts:
     coordinator: float = 5.0         # ventetid paa COORDINATOR efter OK
     heartbeat_interval: float = 2.0  # coordinator sender heartbeat saa ofte
     heartbeat_timeout: float = 5.0   # uden heartbeat saa laenge -> ny election
+    # Kun forbedret version: ekstra ventetid pr. hoejere kandidat foer election
+    # (prioritetsforsinkelse, Garcia-Molina s. 53). Skal vaere > ok, saa en hoejere
+    # node naar at vinde og sende COORDINATOR, foer en lavere node starter.
+    election_delay_step: float = 4.0
 
 
 @dataclass
