@@ -1,0 +1,55 @@
+@startuml deployment
+' UML deployment diagram: Bully leader election on Kubernetes (kind)
+' Render: docker run --rm -v "$PWD":/data plantuml/plantuml -tpng /data/deployment.puml
+
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam linetype ortho
+skinparam nodesep 30
+skinparam ranksep 40
+skinparam node {
+  BackgroundColor #FCFCFB
+  BorderColor #52514E
+}
+skinparam node<<pod>> {
+  BackgroundColor #EAF7D9
+}
+skinparam artifact {
+  BackgroundColor #E3EEFB
+  BorderColor #2A78D6
+}
+skinparam cloud {
+  BackgroundColor #EFE6F7
+  BorderColor #8E6CB8
+}
+
+node "kind cluster" as kind {
+  node "Node: bully-worker" as w1 {
+    node "Pod: bully-0" <<pod>> as p0 {
+      artifact "container\nbully-app" as c0
+    }
+    node "Pod: bully-1" <<pod>> as p1 {
+      artifact "container\nbully-app" as c1
+    }
+    label "..." as dots1
+  }
+  node "Node: bully-worker2" as w2 {
+    node "Pod: bully-2" <<pod>> as p2 {
+      artifact "container\nbully-app" as c2
+    }
+    node "Pod: bully-(n-1)" <<pod>> as pn {
+      artifact "container\nbully-app" as cn
+    }
+    label "..." as dots2
+  }
+}
+
+cloud "Network\nheadless service: bully-k.bully:8080 (HTTP)" as net
+
+p0 -- net
+p1 -- net
+p2 -- net
+pn -- net
+
+@enduml

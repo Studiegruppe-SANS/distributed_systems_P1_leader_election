@@ -1,0 +1,70 @@
+# GENERERET af gen_compose.py — ret dér i stedet for her.
+#   python3 gen_compose.py --n 5
+name: bully
+
+x-node: &node
+  build: .
+  image: bully-app:latest
+  stop_grace_period: 2s
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/status', timeout=2)"]
+    interval: 2s
+    timeout: 3s
+    retries: 15
+
+services:
+  bully-0:
+    <<: *node
+    hostname: bully-0
+    ports: ["8080:8080"]
+    environment:
+      NODE_ID: "0"
+      CLUSTER_SIZE: "5"
+      ALGORITHM: ${ALGORITHM:-classic}
+      SERVICE_NAME: bully
+      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
+  bully-1:
+    <<: *node
+    hostname: bully-1
+    ports: ["8081:8080"]
+    environment:
+      NODE_ID: "1"
+      CLUSTER_SIZE: "5"
+      ALGORITHM: ${ALGORITHM:-classic}
+      SERVICE_NAME: bully
+      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
+  bully-2:
+    <<: *node
+    hostname: bully-2
+    ports: ["8082:8080"]
+    environment:
+      NODE_ID: "2"
+      CLUSTER_SIZE: "5"
+      ALGORITHM: ${ALGORITHM:-classic}
+      SERVICE_NAME: bully
+      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
+  bully-3:
+    <<: *node
+    hostname: bully-3
+    ports: ["8083:8080"]
+    environment:
+      NODE_ID: "3"
+      CLUSTER_SIZE: "5"
+      ALGORITHM: ${ALGORITHM:-classic}
+      SERVICE_NAME: bully
+      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
+  bully-4:
+    <<: *node
+    hostname: bully-4
+    ports: ["8084:8080"]
+    environment:
+      NODE_ID: "4"
+      CLUSTER_SIZE: "5"
+      ALGORITHM: ${ALGORITHM:-classic}
+      SERVICE_NAME: bully
+      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
