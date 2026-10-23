@@ -1,0 +1,4 @@
+# Kun til jeres Mac (ikke i Docker-imaget): systemtest og grafer
+pytest>=8
+pandas>=2
+matplotlib>=3.8

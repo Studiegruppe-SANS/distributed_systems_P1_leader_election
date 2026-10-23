@@ -22,6 +22,20 @@ spec:
           imagePullPolicy: Never         # brug det lokalt byggede image, hent intet
           ports:
             - containerPort: 8080
+          # Klar naar HTTP-serveren svarer. DNS virker allerede foer (publishNotReadyAddresses),
+          # saa proben paavirker ikke valget — kun kubectl get pods / rollout status.
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8080
+            periodSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
           env:
             - name: CLUSTER_SIZE
               value: "5"

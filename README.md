@@ -26,3 +26,8 @@ As an overall assessment of the Bully Election algorithms, a brief comparison wi
 
 ## References
 [1] Hector Garcia-Molina. “Elections in a Distributed Computing System”. In: IEEE Transactions on Computers C-31.1 (1982), pp. 48–59 :)
+
+
+## Running the simulation
+The nodes run in Docker containers, orchestrated with Kubernetes (kind) or Docker Compose.
+See [docker/README.md](docker/README.md) for setup, experiments and the system test.
