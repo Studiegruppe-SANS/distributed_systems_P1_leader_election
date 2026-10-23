@@ -28,12 +28,12 @@ PLOTS = RESULTS / "plots"
 COLORS = {"classic": "#2a78d6", "improved": "#eb6834"}
 TEXT, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 SCENARIO_TITLES = {
-    "startup": "Opstart",
-    "failover": "Failover (alle opdager)",
-    "worst": "Værste tilfælde (node 0 starter)",
-    "crash-middle": "Crash af ikke-leder",
-    "crash-two": "Crash af de to højeste",
-    "recover-leader": "Leder kommer tilbage",
+    "startup": "System Start-up",
+    "failover": "Coordinator Failure (Detected by All)",
+    "worst": "Coordinator Failure (Worst Case)",
+    "crash-middle": "Non-Coordinator Failure",
+    "crash-two": "Simultaneous Failure of Two Highest",
+    "recover-leader": "Coordinator Recovery",
 }
 # Teoretiske beskedtal for vaerste tilfaelde (samme formler som cmd_worst i experiment.py)
 THEORY = {"classic": lambda n: n * (n - 1), "improved": lambda n: 3 * n - 3}
@@ -58,7 +58,7 @@ def summarize(df: pd.DataFrame) -> pd.DataFrame:
 
 def style(ax, title, ylabel):
     ax.set_title(title, color=TEXT, fontsize=11, loc="left")
-    ax.set_xlabel("Antal noder (N)", color=MUTED, fontsize=9)
+    ax.set_xlabel("Number of processes (n)", color=MUTED, fontsize=9)
     ax.set_ylabel(ylabel, color=MUTED, fontsize=9)
     ax.tick_params(colors=MUTED, labelsize=8, length=0)
     ax.grid(axis="y", color=GRID, linewidth=0.8)
@@ -95,7 +95,7 @@ def plot(summary: pd.DataFrame, metric: str, ylabel: str, filename: str, theory:
             if theory and scenario == "worst":
                 # Teori som tynd moerk stiplet linje oeverst, saa den ses selv naar maalingerne rammer den
                 ax.plot(d["n"], [THEORY[algo](n) for n in d["n"]], color=TEXT, linewidth=1,
-                        linestyle="--", zorder=4, label="teori: n(n-1) og 3n-3")
+                        linestyle="--", zorder=4, label="Theoretical worst case: n(n-1) and 3(n-1)")
             # Direkte label ved sidste punkt, i tekstfarve (farven baeres af linjen)
             last = d.iloc[-1]
             value = last[f"{metric}_mean"]
@@ -105,10 +105,10 @@ def plot(summary: pd.DataFrame, metric: str, ylabel: str, filename: str, theory:
         # Er tallene ens, ligger improved-linjen oven paa classic. Sig det, saa classic ikke ser ud til at mangle.
         per_algo = [tuple(data[data["algorithm"] == a].sort_values("n")[f"{metric}_mean"]) for a in COLORS]
         if drawn and len(per_algo[0]) and per_algo[0] == per_algo[1]:
-            ax.text(0.02, 0.95, "classic og improved er ens", transform=ax.transAxes,
+            ax.text(0.02, 0.95, "Identical for both versions", transform=ax.transAxes,
                     ha="left", va="top", fontsize=8, color=MUTED)
         if not drawn:
-            ax.text(0.5, 0.5, "ingen election (forventet)", transform=ax.transAxes,
+            ax.text(0.5, 0.5, "No election required (expected)", transform=ax.transAxes,
                     ha="center", va="center", fontsize=9, color=MUTED)
         style(ax, SCENARIO_TITLES[scenario], ylabel)
     for ax in axes.flat[len(scenarios):]:
@@ -135,8 +135,8 @@ def main() -> None:
     summary = summarize(df)
     summary.to_csv(PLOTS / "summary.csv", index=False)
     print(f"Laeste {len(df)} koersler fra {src}")
-    print(plot(summary, "total", "Election-beskeder", "messages_vs_n.png", theory=True))
-    print(plot(summary, "time", "Election-tid (s)", "time_vs_n.png", theory=False))
+    print(plot(summary, "total", "Number of election messages", "messages_vs_n.png", theory=True))
+    print(plot(summary, "time", "Election time (s)", "time_vs_n.png", theory=False))
     print(PLOTS / "summary.csv")
     wrong = df[~df["correct"].astype(bool)]
     if len(wrong):
