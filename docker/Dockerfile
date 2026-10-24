@@ -1,16 +1,16 @@
-# Basis: et lille Linux-image med Python 3.12 (findes til Apple Silicon/arm64)
+# Linux-image som basis
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Afhaengigheder foerst, saa Docker kan genbruge dette lag ved kodeaendringer
+# installeres før koden kopieres, så laget genbruges når koden ændres
 RUN pip install --no-cache-dir aiohttp==3.10.11
 
-# Jeres kode
 COPY bully_node.py improved_bully_node.py app.py ./
 
-# Print med det samme i stedet for at buffere (ellers ser kubectl logs ingenting)
+# output skrives med det samme, så det kan ses i kubectl logs
 ENV PYTHONUNBUFFERED=1
 
+# porten app.py lytter på
 EXPOSE 8080
 CMD ["python", "app.py"]

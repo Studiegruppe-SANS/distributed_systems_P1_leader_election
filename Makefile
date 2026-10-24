@@ -1,12 +1,12 @@
-# Bully leader election — Docker Compose og Kubernetes (kind).
-# Se docker/README.md for forklaring.
+# bully leader election med Docker Compose og Kubernetes (kind)
+# se docker/README.md for forklaring
 #
 #   make build                         byg imaget bully-app:latest
 #   make compose-up ALGO=improved N=5  start N noder med Docker Compose
 #   make compose-down
-#   make test                          systemtest af begge algoritmer (Docker Compose)
+#   make test                          unit-tests og systemtest af begge algoritmer (kræver Docker)
 #   make kind-up                       opret kind-klyngen
-#   make kind-load                     byg + indlaes imaget i kind (efter hver kodeaendring)
+#   make kind-load                     byg + indlæs imaget i kind (efter hver kodeændring)
 #   make deploy ALGO=classic N=5       (gen)start poddene i Kubernetes
 #   make status                        vis tilstand og beskedtal
 #   make experiments                   fuld sammenligning -> results/sweep-*.csv
@@ -26,11 +26,11 @@ PYTHON  ?= python3
 build:
 	docker build -t $(IMAGE) docker/
 
-# --- Docker Compose ----------------------------------------------------
+# Docker Compose
 compose-up:
 	cd docker && $(PYTHON) gen_compose.py --n $(N)
 	cd docker && ALGORITHM=$(ALGO) docker compose up --build -d --wait
-	@echo "Noderne svarer paa localhost:8080 ... localhost:$$((8080 + $(N) - 1))"
+	@echo "Noderne svarer på localhost:8080 ... localhost:$$((8080 + $(N) - 1))"
 
 compose-down:
 	cd docker && docker compose down
@@ -38,7 +38,7 @@ compose-down:
 test:
 	$(PYTHON) -m pytest testing/ -v
 
-# --- Kubernetes (kind) -------------------------------------------------
+# Kubernetes (kind)
 kind-up:
 	kind create cluster --name $(CLUSTER) --config docker/k8s/kind-cluster.yaml
 	kubectl apply -f docker/k8s/headless-service.yaml

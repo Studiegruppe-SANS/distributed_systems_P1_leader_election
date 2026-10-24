@@ -1,12 +1,15 @@
-# StatefulSet: koerer N kopier af imaget med faste navne bully-0 ... bully-(N-1).
+# statefulset kører N kopier af imaget med navne bully-0 ... bully-(N-1)
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: bully
 spec:
-  serviceName: bully              # knytter poddene til den headless service
-  replicas: 5                     # antal noder (husk ogsaa CLUSTER_SIZE nedenfor)
-  podManagementPolicy: Parallel   # start alle pods samtidig i stedet for en ad gangen
+  # forbinder pods til headless service
+  serviceName: bully
+  # antal noder N, skal matche CLUSTER_SIZE
+  replicas: 5
+  # starter alle pods samtidigt
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app: bully
@@ -15,15 +18,17 @@ spec:
       labels:
         app: bully
     spec:
-      terminationGracePeriodSeconds: 2   # luk hurtigt ned ved delete/scale
+      # fjerner pod senest 2 sek efter en pod slettes
+      terminationGracePeriodSeconds: 2
       containers:
         - name: bully
           image: bully-app:latest
-          imagePullPolicy: Never         # brug det lokalt byggede image, hent intet
+          # bruger lokalt image, puller ikke
+          imagePullPolicy: Never
           ports:
             - containerPort: 8080
-          # Klar naar HTTP-serveren svarer. DNS virker allerede foer (publishNotReadyAddresses),
-          # saa proben paavirker ikke valget — kun kubectl get pods / rollout status.
+          # styrer ready kolonnen, når vi inspicerer pods
+          # noderne kan nå hinanden inden en pod er markeret som ready
           readinessProbe:
             httpGet:
               path: /status

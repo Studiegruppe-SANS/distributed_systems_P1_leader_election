@@ -1,18 +1,5 @@
-"""
-bully_node.py — Bully Election (Garcia-Molina 1982) som ren logik.
-
-Klassen kender intet til netvaerk, traade eller sockets. Den har tre indgange:
-    start()           kaldes ved opstart (starter en election)
-    on_message(msg)   kaldes af runtime naar en besked ankommer
-    tick()            kaldes periodisk (fx hvert 100 ms) og haandterer timeouts
-og én udgang, som injiceres udefra:
-    send(target_id, msg)   UDP, HTTP (Kubernetes) eller et fake netvaerk i tests
-
-Uret (clock) injiceres ogsaa, saa tests kan styre tiden deterministisk.
-
-Den forbedrede version laves som en subklasse, der overskriver
-start_election() og/eller handlerne _on_election / _on_ok / _on_coordinator.
-"""
+# implementering af den klassiske bully algoritme
+# improved_bully_node.py arver herfra og overskriver de dele der optimeres
 
 from __future__ import annotations
 
@@ -30,15 +17,14 @@ class MsgType(str, Enum):
     HEARTBEAT = "HEARTBEAT"
 
 
-# Beskeder der tæller med i election-message-complexity.
-# HEARTBEAT er failure detection og holdes adskilt, ellers forurener den maalingerne.
+# beskeder der tæller med i election-message-complexity
 ELECTION_MESSAGES = frozenset({MsgType.ELECTION, MsgType.OK, MsgType.COORDINATOR})
 
 
 class State(Enum):
-    NORMAL = "NORMAL"      # kender en coordinator (eller er selv coordinator)
-    ELECTION = "ELECTION"  # har sendt ELECTION til hoejere noder, venter paa OK
-    WAITING = "WAITING"    # har faaet OK, venter paa COORDINATOR
+    NORMAL = "NORMAL"      # har en coordinator, eller er selv coordinator
+    ELECTION = "ELECTION"  # har sendt ELECTION til højere noder, afventer OK
+    WAITING = "WAITING"    # har fået OK, venter på COORDINATOR-besked
 
 
 @dataclass
@@ -61,13 +47,12 @@ class Message:
 
 @dataclass
 class Timeouts:
-    ok: float = 3.0                  # ventetid paa OK efter ELECTION (T hos Garcia-Molina)
-    coordinator: float = 5.0         # ventetid paa COORDINATOR efter OK
-    heartbeat_interval: float = 2.0  # coordinator sender heartbeat saa ofte
-    heartbeat_timeout: float = 5.0   # uden heartbeat saa laenge -> ny election
-    # Kun forbedret version: ekstra ventetid pr. hoejere kandidat foer election
-    # (prioritetsforsinkelse, Garcia-Molina s. 53). Skal vaere > ok, saa en hoejere
-    # node naar at vinde og sende COORDINATOR, foer en lavere node starter.
+    ok: float = 3.0                  # ventetid på OK efter ELECTION
+    coordinator: float = 5.0         # ventetid på COORDINATOR efter OK
+    heartbeat_interval: float = 2.0  # tidsinterval mellem heartbeat-besker
+    heartbeat_timeout: float = 5.0   # tid uden heartbeat, før der startes ny election
+    # bruges kun for forbedret version: delay som sikrer, at en node når at vinde og sende COORDINATOR,
+    # før en lavere node starter (anvender prioritetsforsinkelse fra Invitation-algoritmen, Garcia-Molina s. 53)
     election_delay_step: float = 4.0
 
 
@@ -78,7 +63,7 @@ class Stats:
     elections_started: int = 0
 
     def election_sent(self) -> int:
-        """Antal sendte election-beskeder (ekskl. heartbeats)."""
+        # antal sendte election-beskeder (ekskl. heartbeats)
         return sum(n for t, n in self.sent.items() if t in ELECTION_MESSAGES)
 
     def reset(self) -> None:
@@ -115,16 +100,10 @@ class BullyNode:
         self._last_heartbeat = clock()
         self._next_heartbeat = clock()
 
-    # ------------------------------------------------------------------
-    # Offentlig API
-    # ------------------------------------------------------------------
+    # kaldes udefra af app.py og tests
     @property
     def is_coordinator(self) -> bool:
         return self.coordinator_id == self.id
-
-    def set_peers(self, peer_ids: Iterable[int]) -> None:
-        """Opdater kendte noder (fx fra Kubernetes headless service discovery)."""
-        self.peers = set(peer_ids) - {self.id}
 
     def start(self) -> None:
         self.start_election()
@@ -144,12 +123,12 @@ class BullyNode:
         now = self.clock()
 
         if self.state == State.ELECTION and now >= self._deadline:
-            # Ingen hoejere node svarede OK -> jeg vinder
+            # ingen højere node svarede OK, så denne node vinder
             self.log("ingen OK modtaget")
             self.declare_victory()
 
         elif self.state == State.WAITING and now >= self._deadline:
-            # En hoejere node svarede OK, men doede foer den sendte COORDINATOR
+            # højere node svarede OK, men døde før COORDINATOR blev broadcastet
             self.log("ingen COORDINATOR modtaget -> genstarter election")
             self.state = State.NORMAL
             self.start_election()
@@ -164,15 +143,12 @@ class BullyNode:
                 self.log("coordinator timeout -> starter election")
                 self.start_election()
 
-    # ------------------------------------------------------------------
-    # Algoritmen (overskriv disse i den forbedrede version)
-    # ------------------------------------------------------------------
+    # algoritmen for selve valget: start_election, declare_victory osv.
     def higher_peers(self) -> list[int]:
         return sorted(p for p in self.peers if p > self.id)
 
     def start_election(self) -> None:
-        # Koerer der allerede en election (eller venter vi paa en hoejere
-        # nodes COORDINATOR), starter vi ikke en ny.
+        # starter ikke ny election, hvis der allerede kører en, eller der ventes på COORDINATOR
         if self.state in (State.ELECTION, State.WAITING):
             return
 
@@ -199,10 +175,9 @@ class BullyNode:
             self._send(p, MsgType.COORDINATOR, coordinator_id=self.id)
         self._next_heartbeat = self.clock() + self.t.heartbeat_interval
 
-    # ------------------------------------------------------------------
-    # Handlere
-    # ------------------------------------------------------------------
+    # handlere som håndterer beskeder mellem noderne
     def _on_election(self, msg: Message) -> None:
+        # svarer OK og starter eget valg, hvis lavere node har startet et valg
         if msg.sender_id < self.id:
             self._send(msg.sender_id, MsgType.OK)
             self.start_election()
@@ -215,8 +190,8 @@ class BullyNode:
     def _on_coordinator(self, msg: Message) -> None:
         new = msg.coordinator_id if msg.coordinator_id is not None else msg.sender_id
         if new < self.id:
-            # En lavere node har udråbt sig selv -> "bully" den med en ny election
-            self.log(f"lavere node {new} paastaar at vaere coordinator -> election")
+            # lavere node har udråbt sig selv som vinder, så der udskrives nyt valg
+            self.log(f"lavere node {new} påstår at være coordinator -> election")
             self.state = State.NORMAL
             self.start_election()
             return
@@ -230,17 +205,15 @@ class BullyNode:
         if msg.sender_id == self.coordinator_id:
             self._last_heartbeat = self.clock()
 
-    # ------------------------------------------------------------------
-    # Hjaelpere
-    # ------------------------------------------------------------------
+    # hjælper-funktioner
     def _send(self, target: int, type_: MsgType, **kwargs) -> None:
         msg = Message(type_, self.id, **kwargs)
-        # Taelles som sendt uanset om modtageren lever — i Bully koster en
-        # besked til en doed node stadig en besked.
+        # tæller sendte beskeder op, også beskeder sendt til døde noder tæller med
         self.stats.sent[type_] += 1
         try:
             self._send_fn(target, msg)
-        except Exception as e:  # netvaerksfejl maa aldrig vaelte algoritmen
+        # hvis netværket fejler, skal det ikke crashe noden
+        except Exception as e:
             self.log(f"kunne ikke sende {type_.value} til {target}: {e}")
 
     def log(self, text: str) -> None:

@@ -1,4 +1,4 @@
-# GENERERET af gen_compose.py — ret dér i stedet for her.
+# genereret af gen_compose.py, så ret der, hvis noget skal rettes
 #   python3 gen_compose.py --n 5
 name: bully
 
@@ -22,7 +22,7 @@ services:
       CLUSTER_SIZE: "5"
       ALGORITHM: ${ALGORITHM:-classic}
       SERVICE_NAME: bully
-      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      # i compose kan noderne tilgås direkte på bully-{id}, der er ingen headless service som i k8s
       PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
   bully-1:
     <<: *node
@@ -33,7 +33,7 @@ services:
       CLUSTER_SIZE: "5"
       ALGORITHM: ${ALGORITHM:-classic}
       SERVICE_NAME: bully
-      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      # i compose kan noderne tilgås direkte på bully-{id}, der er ingen headless service som i k8s
       PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
   bully-2:
     <<: *node
@@ -44,7 +44,7 @@ services:
       CLUSTER_SIZE: "5"
       ALGORITHM: ${ALGORITHM:-classic}
       SERVICE_NAME: bully
-      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      # i compose kan noderne tilgås direkte på bully-{id}, der er ingen headless service som i k8s
       PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
   bully-3:
     <<: *node
@@ -55,7 +55,7 @@ services:
       CLUSTER_SIZE: "5"
       ALGORITHM: ${ALGORITHM:-classic}
       SERVICE_NAME: bully
-      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      # i compose kan noderne tilgås direkte på bully-{id}, der er ingen headless service som i k8s
       PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
   bully-4:
     <<: *node
@@ -66,5 +66,5 @@ services:
       CLUSTER_SIZE: "5"
       ALGORITHM: ${ALGORITHM:-classic}
       SERVICE_NAME: bully
-      # Compose-DNS: service-navnet bully-{id} er nok (ingen headless service som i k8s)
+      # i compose kan noderne tilgås direkte på bully-{id}, der er ingen headless service som i k8s
       PEER_URL_TEMPLATE: "http://{service}-{id}:{port}"
