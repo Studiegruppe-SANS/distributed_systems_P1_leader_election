@@ -44,4 +44,3 @@ As an overall assessment of the Bully Election algorithms, a brief comparison wi
 
 ## Running the simulation
 The nodes run in Docker containers, orchestrated with Kubernetes (kind) or Docker Compose.
-See [docker/README.md](docker/README.md) for setup, experiments and the system test.

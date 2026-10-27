@@ -1,5 +1,4 @@
 # bully leader election med Docker Compose og Kubernetes (kind)
-# se docker/README.md for forklaring
 #
 #   make build                         byg imaget bully-app:latest
 #   make compose-up ALGO=improved N=5  start N noder med Docker Compose

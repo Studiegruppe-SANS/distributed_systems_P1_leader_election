@@ -1,5 +1,4 @@
 # genererer compose.yaml med n bully-noder, så clusteret kan køres uden Kubernetes
-# hver node kan tilgås via localhost:8080+id, se docker/README.md for kommandoer
 
 import argparse
 from pathlib import Path
