@@ -1,5 +1,19 @@
 # Group 8: P1 (Leader Election)
 
+## Relevant code files for this project:
+Algorithm code files:
+- `distributed_systems_P1_leader_election/docker/bully_node.py`
+- `distributed_systems_P1_leader_election/docker/improved_bully_node.py`
+- `distributed_systems_P1_leader_election/docker/experiment.py`
+- `distributed_systems_P1_leader_election/docker/app.py`
+
+Results:
+- `distributed_systems_P1_leader_election/results`
+
+Testing:
+- `distributed_systems_P1_leader_election/testing/test_bully_node.py`
+- `distributed_systems_P1_leader_election/testing/test_system.py`
+
 ## Background
 This project is about leader election in distributed systems. Many distributed systems require a single process/node to act as a leader of the computational tasks to be carried out. The election is conducted by a so called leader election algorithm.
 
