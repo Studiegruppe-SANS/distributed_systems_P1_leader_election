@@ -1,17 +1,5 @@
-#!/usr/bin/env python3
-"""
-gen_compose.py — genererer compose.yaml med N Bully-noder (bully-0 ... bully-(N-1)).
-
-Docker Compose er den hurtige vej til at koere klyngen uden Kubernetes: ingen cluster,
-og hver node kan naas direkte fra Mac'en paa localhost:8080+id.
-
-Brug (fra docker-mappen):
-  python3 gen_compose.py --n 5                       skriv compose.yaml med 5 noder
-  ALGORITHM=improved docker compose up --build -d    start klyngen (classic er default)
-  curl localhost:8084/status                         se node 4
-  curl -X POST localhost:8084/crash                  simuler at node 4 doer
-  docker compose down                                stop det hele
-"""
+# genererer compose.yaml med n bully-noder, så clusteret kan køres uden Kubernetes
+# hver node kan tilgås via localhost:8080+id, se docker/README.md for kommandoer
 
 import argparse
 from pathlib import Path
@@ -20,7 +8,7 @@ OUT = Path(__file__).resolve().parent / "compose.yaml"
 BASE_PORT = 8080
 
 HEADER = """\
-# GENERERET af gen_compose.py — ret dér i stedet for her.
+# genereret af gen_compose.py, så ret der, hvis noget skal rettes
 #   python3 gen_compose.py --n {n}
 name: bully
 
@@ -47,7 +35,7 @@ SERVICE = """\
       CLUSTER_SIZE: "{n}"
       ALGORITHM: ${{ALGORITHM:-classic}}
       SERVICE_NAME: bully
-      # Compose-DNS: service-navnet bully-{{id}} er nok (ingen headless service som i k8s)
+      # i compose kan noderne tilgås direkte på bully-{{id}}, der er ingen headless service som i k8s
       PEER_URL_TEMPLATE: "http://{{service}}-{{id}}:{{port}}"
 """
 
@@ -58,7 +46,7 @@ def render(n: int) -> str:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description="Genererer compose.yaml med n bully-noder")
     p.add_argument("--n", type=int, default=5, help="antal noder (default 5)")
     args = p.parse_args()
     OUT.write_text(render(args.n))

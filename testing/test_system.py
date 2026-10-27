@@ -1,13 +1,6 @@
-"""
-Systemtest af begge Bully-algoritmer i rigtige containere (Docker Compose, 5 noder).
-
-Hver algoritme faar sin egen klynge (modul-fixture, parametriseret), og testene koerer
-i raekkefoelge mod den. Noder slaas ihjel med POST /crash og genoplives med /recover.
-
-Koer fra repo-roden (kraever Docker):
-  pip install -r requirements-dev.txt
-  python3 -m pytest testing/test_system.py -v
-"""
+# systemtest af begge algoritmer i rigtige containere (Docker Compose, 5 noder)
+# hver algoritme får sit eget cluster, og testene kører i rækkefølge på samme cluster
+# kræver at Docker kører: python3 -m pytest testing/test_system.py -v
 
 import json
 import os
@@ -23,9 +16,8 @@ N = 5
 LEADER = N - 1
 
 
-# ----------------------------------------------------------------------
-# Hjaelpere
-# ----------------------------------------------------------------------
+# hjælper-funktioner
+# kalder endpoint på en node via localhost, node i har port 8080 + i
 def call(node, path, method="GET"):
     req = urllib.request.Request(f"http://localhost:{8080 + node}{path}",
                                  data=None if method == "GET" else b"", method=method)
@@ -76,12 +68,11 @@ def compose(*args, algorithm):
     subprocess.run(["docker", "compose", *args], cwd=DOCKER_DIR, env=env, check=True)
 
 
-# ----------------------------------------------------------------------
-# Klynge pr. algoritme
-# ----------------------------------------------------------------------
+# et cluster pr. algoritme
 @pytest.fixture(scope="module", params=["classic", "improved"])
 def cluster(request):
     algorithm = request.param
+    # sikrer at compose.yaml har N noder
     subprocess.run(["python3", "gen_compose.py", "--n", str(N)], cwd=DOCKER_DIR, check=True)
     compose("up", "--build", "-d", "--wait", "--force-recreate", algorithm=algorithm)
     try:
@@ -91,9 +82,7 @@ def cluster(request):
         compose("down", algorithm=algorithm)
 
 
-# ----------------------------------------------------------------------
-# Tests (koeres i denne raekkefoelge for hver algoritme)
-# ----------------------------------------------------------------------
+# tests, køres i denne rækkefølge for hver algoritme
 def test_startup_elects_highest(cluster):
     wait_for_leader(LEADER)
 
@@ -103,7 +92,7 @@ def test_leader_crash_elects_next_highest(cluster):
     call(LEADER, "/crash", "POST")
     wait_for_leader(LEADER - 1)
     call(LEADER, "/recover", "POST")
-    wait_for_leader(LEADER)                       # den gamle leder bullier sig tilbage
+    wait_for_leader(LEADER)                       # den gamle leder starter valg og bliver coordinator
 
 
 def test_two_highest_crash(cluster):
@@ -120,7 +109,7 @@ def test_non_leader_crash_keeps_leader(cluster):
     wait_for_leader(LEADER)
     reset_stats()
     call(2, "/crash", "POST")
-    time.sleep(8)                                 # laengere end heartbeat-timeout (5 s)
+    time.sleep(8)                                 # længere end heartbeat-timeout (5 s)
     assert agree_on(LEADER)
     assert sum(s["elections_started"] for s in alive()) == 0
     call(2, "/recover", "POST")
@@ -128,15 +117,15 @@ def test_non_leader_crash_keeps_leader(cluster):
 
 
 def test_worst_case_message_complexity(cluster):
-    """Lederen doer, og kun node 0 starter valget. Beskedtallet skal matche teorien:
-    classic n(n-1), improved 3n-3."""
+    # lederen dør, og kun node 0 starter valget. beskedtallet skal matche teorien:
+    # classic n(n-1), improved 3(n-1)
     wait_for_leader(LEADER)
-    time.sleep(1)                                 # lad efternoelende beskeder lande
+    time.sleep(1)                                 # venter på at sene beskeder lander
     reset_stats()
     call(LEADER, "/crash", "POST")
     call(0, "/election", "POST")
     wait_for_leader(LEADER - 1)
-    time.sleep(1)
+    time.sleep(1)                                 # venter på at sene beskeder lander
     expected = N * (N - 1) if cluster == "classic" else 3 * N - 3
     assert total_election_messages() == expected
     call(LEADER, "/recover", "POST")

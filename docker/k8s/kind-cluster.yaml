@@ -1,6 +1,5 @@
-# Lokal Kubernetes-klynge i Docker (kind): 1 control-plane + 2 workers,
-# saa poddene fordeles paa flere "maskiner".
-#   kind create cluster --name bully --config k8s/kind-cluster.yaml
+# lokal kubernetes cluster i Docker (kind), inddelt med 1 control-plane + 2 workers,
+# fordeler pods over flere noder
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:

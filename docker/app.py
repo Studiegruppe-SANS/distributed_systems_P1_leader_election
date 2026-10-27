@@ -1,24 +1,5 @@
-"""
-app.py — runner der pakker BullyNode ind i en HTTP-server (aiohttp).
-
-Hver pod koerer denne fil. Den goer tre ting:
-  1. Modtager beskeder fra andre pods paa  POST /message  og giver dem til node.on_message()
-  2. Kalder node.tick() hvert 100 ms (timeouts og heartbeats)
-  3. Sender beskeder til andre pods som HTTP POST (send-funktionen BullyNode faar) 
-
-ID og adresser:
-  En StatefulSet giver poddene navnene bully-0, bully-1, ... Tallet bruges som ID.
-  Den headless service giver hver pod et fast DNS-navn: bully-3.bully -> pod 3's IP.
-  Derfor kan vi naa node k paa  http://bully-k.bully:8080  uden at kende dens IP.
-
-Alt koerer i én asyncio event loop, saa der er ingen traade og ingen locks.
-
-Fejlinjektion (til eksperimenter og systemtest):
-  POST /crash    noden opfoerer sig som doed: ignorerer beskeder, sender intet, tikker ikke.
-                 HTTP-serveren koerer videre, saa /status og /recover stadig virker.
-  POST /recover  noden genstarter med frisk tilstand (som efter et rigtigt crash) og
-                 starter en election — Garcia-Molinas recovery-tilfaelde.
-"""
+# kører en bully_node som HTTP-server i hver pod, modtager beskeder på /message
+# node.tick() kaldes hvert 100 ms, /crash og /recover bliver brugt til at simulere nedbrud i eksperimenter
 
 import asyncio
 import os
@@ -31,27 +12,27 @@ from aiohttp import ClientSession, ClientTimeout, web
 from bully_node import BullyNode, Message, MsgType
 from improved_bully_node import ImprovedBullyNode
 
-# Vælg algoritme på baggrund af "classic" og "improved"
+# valg af algoritme, enten "classic" eller "improved"
 ALGORITHMS = {"classic": BullyNode, "improved": ImprovedBullyNode}
 ALGORITHM = os.environ.get("ALGORITHM", "classic")
 NodeClass = ALGORITHMS[ALGORITHM]
 
-# ----------------------------------------------------------------------
-# Konfiguration (saettes som miljoevariabler i statefulset.yaml)
-# ----------------------------------------------------------------------
+# konfiguration med miljøvariabler ud fra statefulset.yaml
 SERVICE = os.environ.get("SERVICE_NAME", "bully")
 CLUSTER_SIZE = int(os.environ.get("CLUSTER_SIZE", "5"))
 PORT = int(os.environ.get("PORT", "8080"))
 STARTUP_DELAY = float(os.environ.get("STARTUP_DELAY", "3"))
 TICK_INTERVAL = 0.1
-# Adresse paa node {id}. Kan overskrives til lokal test uden Kubernetes.
+# adresse på andre noder, muligt at overwrite ved lokale tests
 PEER_URL = os.environ.get("PEER_URL_TEMPLATE", "http://{service}-{id}.{service}:{port}")
 
 
 def get_node_id() -> int:
-    if "NODE_ID" in os.environ:                       # til lokal test
+    # til lokal test
+    if "NODE_ID" in os.environ:
         return int(os.environ["NODE_ID"])
-    return int(socket.gethostname().rsplit("-", 1)[1])  # "bully-3" -> 3
+    # finder frem til id ud fra podnavn, "bully-3" -> id: 3
+    return int(socket.gethostname().rsplit("-", 1)[1])
 
 
 NODE_ID = get_node_id()
@@ -65,9 +46,7 @@ def peer_url(node_id: int) -> str:
     return PEER_URL.format(service=SERVICE, id=node_id, port=PORT)
 
 
-# ----------------------------------------------------------------------
-# Udgaaende beskeder
-# ----------------------------------------------------------------------
+# udgående beskeder
 async def post_message(app: web.Application, target: int, msg: Message) -> None:
     try:
         async with app["session"].post(f"{peer_url(target)}/message",
@@ -75,28 +54,28 @@ async def post_message(app: web.Application, target: int, msg: Message) -> None:
             await resp.read()
     except Exception as e:
         if msg.type != MsgType.HEARTBEAT:
-            log(f"Node {NODE_ID}: kunne ikke naa node {target} med {msg.type.value} "
+            log(f"Node {NODE_ID}: kunne ikke nå node {target} med {msg.type.value} "
                 f"({type(e).__name__})")
 
 
 class Runtime:
-    """Den foranderlige tilstand for denne pod. Ligger i ét objekt, fordi aiohttp ikke
-    vil have, at man saetter app[...] efter opstart (/recover udskifter noden)."""
+    # podens tilstand samlet i et objekt, /recover kan udskifte noden under eksperimentet
 
     def __init__(self, app: web.Application):
         self.crashed = False
-        self.tasks: set[asyncio.Task] = set()  # hold en reference, saa tasks ikke garbage-collectes
+        # gemmer tasks, så de ikke slettes, før HTTP-kaldet er færdigt
+        self.tasks: set[asyncio.Task] = set()
         self.node: BullyNode = self.make_node(app)
-        # Tidsmaaling til eksperimenter. Algoritmen kender intet til dem: runneren
-        # kigger paa noden efter hvert kald (observe) og noterer, hvornaar noget aendrer sig.
-        self.coordinator_since: Optional[float] = None  # vaeg-tid for sidste lederskift
-        self.first_election_at: Optional[float] = None  # foerste election siden /stats/reset
+        # tidsmåling til eksperimenter, holder styr på tidspunkter for ændringer, fx ny coordinator osv.
+        self.coordinator_since: Optional[float] = None
+        self.first_election_at: Optional[float] = None
         self._seen_coordinator: Optional[int] = None
         self._seen_elections = 0
 
     def make_node(self, app: web.Application) -> BullyNode:
         return NodeClass(NODE_ID, range(CLUSTER_SIZE), send=make_send(app), log=log)
 
+    # tjekker om noden har fået ny coordinator eller startet et valg, og gemmer tidspunktet
     def observe(self) -> None:
         now = time.time()
         if self.node.coordinator_id != self._seen_coordinator:
@@ -108,7 +87,7 @@ class Runtime:
         self._seen_elections = self.node.stats.elections_started
 
     def recover(self, app: web.Application) -> None:
-        """Ny node med frisk tilstand, men samme beskedtal (de taeller med i eksperimentet)."""
+        # ny node med opstartstilstand, bevarer beskedtallet fra før crashet, så det tæller med i eksperimentet
         stats = self.node.stats
         self.node = self.make_node(app)
         self.node.stats = stats
@@ -122,11 +101,11 @@ class Runtime:
 
 
 def make_send(app: web.Application):
-    """Send-funktionen BullyNode faar. Den starter et HTTP-kald i baggrunden og
-    returnerer med det samme — ligesom UDP blokerer den aldrig algoritmen."""
+    # send-funktion til BullyNode. HTTP-kald startes i baggrunden og returnerer med det samme
     def send(target: int, msg: Message) -> None:
         rt: Runtime = app["rt"]
-        if rt.crashed:                            # en doed node sender intet
+        # død node sender ingenting
+        if rt.crashed:
             return
         task = asyncio.create_task(post_message(app, target, msg))
         rt.tasks.add(task)
@@ -134,11 +113,10 @@ def make_send(app: web.Application):
     return send
 
 
-# ----------------------------------------------------------------------
 # HTTP-endpoints
-# ----------------------------------------------------------------------
 async def handle_message(request: web.Request) -> web.Response:
     rt: Runtime = request.app["rt"]
+    # død node afviser beskeder, så afsenderen ser den er død
     if rt.crashed:
         return web.json_response({"ok": False, "crashed": True}, status=503)
     msg = Message.from_dict(await request.json())
@@ -171,7 +149,7 @@ async def handle_reset_stats(request: web.Request) -> web.Response:
 
 
 async def handle_start_election(request: web.Request) -> web.Response:
-    """Tving denne node til at starte en election (bruges i eksperimenter)."""
+    # tvinger noden til at starte en election
     rt: Runtime = request.app["rt"]
     if not rt.crashed:
         rt.node.start_election()
@@ -186,7 +164,7 @@ async def handle_crash(request: web.Request) -> web.Response:
 
 
 async def handle_recover(request: web.Request) -> web.Response:
-    """Genstart noden med frisk tilstand og lad den starte en election."""
+    # starter noden på ny og lader den starte en election
     rt: Runtime = request.app["rt"]
     if rt.crashed:
         rt.recover(request.app)
@@ -196,26 +174,28 @@ async def handle_recover(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
-# ----------------------------------------------------------------------
-# Livscyklus
-# ----------------------------------------------------------------------
+# opstart og tick()
 async def tick_loop(rt: Runtime) -> None:
-    await asyncio.sleep(STARTUP_DELAY)   # giv de andre pods tid til at komme op
+    # delay giver de andre noder tid til at starte op
+    await asyncio.sleep(STARTUP_DELAY)
     if not rt.crashed:
         rt.node.start()
         rt.observe()
     while True:
         if not rt.crashed:
-            rt.node.tick()                 # slaa op hver gang: /recover udskifter noden
+            # rt.node hentes hver gang, så operationer kører på den nye node efter /recover
+            rt.node.tick()
             rt.observe()
         await asyncio.sleep(TICK_INTERVAL)
 
 
 async def lifecycle(app: web.Application):
+    # besked regnes som fejlet, hvis modtageren ikke svarer inden for 1 sek
     app["session"] = ClientSession(timeout=ClientTimeout(total=1))
     app["rt"] = rt = Runtime(app)
     loop_task = asyncio.create_task(tick_loop(rt))
-    yield                                 # her koerer serveren
+    # serveren kører her, koden efter yield kører ved nedlukning
+    yield
     loop_task.cancel()
     await app["session"].close()
 

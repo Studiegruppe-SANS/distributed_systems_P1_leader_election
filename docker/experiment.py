@@ -1,37 +1,7 @@
-#!/usr/bin/env python3
-"""
-experiment.py — koerer eksperimenter mod Bully-poddene i Kubernetes og samler beskedtal.
+# kører eksperimenterne i Kubernetes vha. kubectl, resultater gemmes som CSV
+# election-tid måles fra første election starter til sidste skift af leder uden heartbeat timeout
 
-Koerer paa jeres Mac (kun Pythons standardbibliotek) og styrer alt via kubectl.
-Beskedtallene hentes fra /status i hver pod med `kubectl exec` og laegges sammen.
-
-Brug (fra docker-mappen):
-  python3 experiment.py status                         vis tilstand og beskedtal for alle pods
-  python3 experiment.py reset                          nulstil beskedtal i alle pods
-  python3 experiment.py deploy --algorithm classic     start poddene forfra med en given algoritme
-  python3 experiment.py startup                        maal opstartsvalget (starter poddene forfra)
-  python3 experiment.py failover                       lederen doer, alle opdager det samtidig
-  python3 experiment.py worst                          lederen doer, kun node 0 starter valget
-  python3 experiment.py crash-middle                   en tilfaeldig ikke-leder doer (boer ikke give valg)
-  python3 experiment.py crash-two                      de to hoejeste noder doer samtidig
-  python3 experiment.py recover-leader                 lederen doer, og kommer tilbage naar ny leder er valgt
-  python3 experiment.py sweep                          alle scenarier x begge algoritmer x flere N -> CSV
-
-deploy og startup tager ogsaa --n (antal noder). De aendrer IKKE statefulset.yaml paa disken,
-de sender en tilpasset kopi til Kubernetes.
-
-Alle scenarier tager --runs R (gentag R gange) og --out FIL.csv (skriv en raekke pr. koersel).
-sweep skriver altid til results/sweep-<tidspunkt>.csv, hvis --out ikke er givet:
-  python3 experiment.py sweep --runs 3 --ns 5 10 15 20
-
-crash-middle, crash-two og recover-leader bruger /crash og /recover i poddene (noden
-opfoerer sig som doed, men poden lever), saa enhver node kan slaas ihjel — ikke kun den
-hoejeste, som ved scale af StatefulSet'en.
-
-Election-tid = seneste lederskift (coordinator_since) minus foerste election-start
-(first_election_at) paa tvaers af de levende noder. Tiden det tager at OPDAGE et crash
-(heartbeat-timeout) er altsaa ikke med.
-"""
+# se docker/README.md for kommandoer og scenarier og project_report/experiments.md for metode
 
 import argparse
 import csv
@@ -48,13 +18,11 @@ HERE = Path(__file__).resolve().parent
 STATEFULSET = HERE / "k8s" / "statefulset.yaml"
 RESULTS = HERE.parent / "results"
 HEARTBEAT_TIMEOUT = 5  # skal passe med Timeouts.heartbeat_timeout i bully_node.py
-SETTLE = 2             # ekstra sekunder efter enighed, saa de sidste beskeder lander
-MAX_WAIT = 90          # maks. ventetid paa enighed om ny leder
+SETTLE = 2             # ekstra tid efter enighed, så de sidste beskeder når at lande
+MAX_WAIT = 90          # maks. ventetid på enighed om ny leder
 
 
-# ----------------------------------------------------------------------
-# kubectl-hjaelpere
-# ----------------------------------------------------------------------
+# kubectl hjælper-funktioner
 def kubectl(*args, input=None, check=True):
     r = subprocess.run(["kubectl", *args], input=input, capture_output=True, text=True)
     if check and r.returncode != 0:
@@ -63,7 +31,7 @@ def kubectl(*args, input=None, check=True):
 
 
 def http(pod, path, method="GET"):
-    """Kalder et endpoint inde i poden (localhost:8080) via kubectl exec. None ved fejl."""
+    # kalder et endpoint inde i poden via kubectl exec, returnerer None ved error
     data = "None" if method == "GET" else "b''"
     code = ("import urllib.request as u;"
             f"r=u.Request('http://localhost:8080{path}', data={data}, method='{method}');"
@@ -85,7 +53,7 @@ def running_pods():
 
 
 def config():
-    """Laeser algoritme, CLUSTER_SIZE og replicas fra den koerende StatefulSet."""
+    # indlæser algoritme, CLUSTER_SIZE og replicas fra den kørende StatefulSet
     data = json.loads(kubectl("get", "statefulset", "bully", "-o", "json").stdout)
     env = {e["name"]: e.get("value")
            for e in data["spec"]["template"]["spec"]["containers"][0].get("env", [])}
@@ -93,8 +61,8 @@ def config():
 
 
 def on_all(path, method="GET"):
-    """Kalder endpointet paa alle koerende pods med ét kubectl exec (inde fra bully-0),
-    i stedet for ét exec pr. pod. Pods der ikke svarer udelades."""
+    # kalder endpoint på alle pods med et kubectl exec fra første pod, i stedet for et pr pod
+    # pods der ikke svarer udelades
     pods = running_pods()
     if not pods:
         return []
@@ -129,7 +97,7 @@ def wait_ready(count, timeout=120):
 
 
 def wait_until_dead(pod, timeout=30):
-    """Venter til poden ikke laengere svarer (den lukker ned ved SIGTERM)."""
+    # venter til poden ikke længere svarer
     end = time.time() + timeout
     while time.time() < end:
         if http(pod, "/status") is None:
@@ -138,15 +106,13 @@ def wait_until_dead(pod, timeout=30):
     sys.exit(f"{pod} svarer stadig efter {timeout} s")
 
 
-# ----------------------------------------------------------------------
-# Rapport
-# ----------------------------------------------------------------------
+# kode til rapport
 TYPES = ("ELECTION", "OK", "COORDINATOR")
 
 
 def election_time(statuses):
-    """Sekunder fra foerste election-start til sidste lederskift blandt levende noder.
-    None hvis ingen election er startet siden sidste /stats/reset."""
+    # sekunder fra første election starter til sidste lederskift blandt levende noder
+    # None hvis ingen election er startet siden sidste /stats/reset
     alive = [s for s in statuses if not s.get("crashed")]
     starts = [s["first_election_at"] for s in alive if s.get("first_election_at")]
     if not starts:
@@ -158,7 +124,7 @@ def election_time(statuses):
 
 
 def report(title, expected=None, note=None, expected_leader=None):
-    """Printer en tabel og returnerer en raekke til CSV."""
+    # printer en tabel og returnerer en række til CSV
     algo, n, _ = config()
     statuses = on_all("/status")
     print(f"\n=== {title} | algoritme: {algo} | CLUSTER_SIZE={n} | pods der svarer: {len(statuses)} ===")
@@ -177,14 +143,14 @@ def report(title, expected=None, note=None, expected_leader=None):
     print(f"{'sum':>4} {'':>9} {'':>5} {'':>4} "
           f"{totals['ELECTION']:>8} {totals['OK']:>4} {totals['COORDINATOR']:>5} {total:>5}")
 
-    # Crashede noder har en foraeldet leder, saa de taeller ikke med i enigheden
+    # nedbrudte noder har forældet leder, så disse tæller ikke med
     leaders = {s["coordinator"] for s in statuses if not s.get("crashed")}
     agreement = len(leaders) == 1
     leader = next(iter(leaders)) if agreement else None
     if agreement:
-        print(f"Enighed: ja, alle levende noder peger paa node {leader}")
+        print(f"Enighed: ja, alle levende noder peger på node {leader}")
     else:
-        print(f"Enighed: NEJ, noderne peger paa {sorted(leaders, key=str)}")
+        print(f"Enighed: NEJ, noderne peger på {sorted(leaders, key=str)}")
     if expected_leader is not None:
         print(f"Forventet leder: {expected_leader} -> {'OK' if leader == expected_leader else 'FORKERT'}")
     seconds = election_time(statuses)
@@ -215,7 +181,7 @@ CSV_FIELDS = ["timestamp", "scenario", "run", "algorithm", "n", "expected_leader
 
 
 def write_row(path, row):
-    """Tilfoejer én raekke til CSV-filen (skriver header hvis filen er ny)."""
+    # tilføjer en række til CSV-filen, header hvis filen er ny
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     new = not path.exists()
@@ -226,11 +192,9 @@ def write_row(path, row):
         w.writerow(row)
 
 
-# ----------------------------------------------------------------------
-# Fejlinjektion og ventetid
-# ----------------------------------------------------------------------
+# crash, recover og vent på ny leder
 def crash(*ids):
-    with ThreadPoolExecutor(len(ids)) as ex:      # parallelt, saa de doer samtidig
+    with ThreadPoolExecutor(len(ids)) as ex:
         list(ex.map(lambda i: http(f"bully-{i}", "/crash", "POST"), ids))
     print(f"Crashede node {', '.join(map(str, ids))}")
 
@@ -242,8 +206,8 @@ def recover(*ids):
 
 
 def wait_for_leader(leader, timeout=MAX_WAIT):
-    """Venter til alle levende noder er i NORMAL og peger paa `leader`, og giver saa
-    efternoelende beskeder et par sekunder til at lande."""
+    # venter til alle aktive noder er i NORMAL og peger på samme leder
+    # tilføjet ekstra par sekunder til forsinkede beskeder
     end = time.time() + timeout
     while time.time() < end:
         alive = [s for s in on_all("/status") if not s.get("crashed")]
@@ -255,9 +219,7 @@ def wait_for_leader(leader, timeout=MAX_WAIT):
     return False
 
 
-# ----------------------------------------------------------------------
-# Kommandoer
-# ----------------------------------------------------------------------
+# deploy af pods og de enkelte scenarier
 def deploy(algorithm=None, n=None):
     cur_algo, cur_n = "classic", 5
     try:
@@ -278,11 +240,11 @@ def deploy(algorithm=None, n=None):
     kubectl("wait", "--for=delete", "pod", "-l", "app=bully", "--timeout=60s", check=False)
     kubectl("apply", "-f", "-", input=text)
     wait_ready(n)
-    print("Alle pods koerer.")
+    print("Alle pods kører.")
 
 
 def ensure_full():
-    """Sikrer at alle CLUSTER_SIZE pods koerer og har valgt en leder."""
+    # sikrer at CLUSTER_SIZE pods kører og har valgt leder
     _, n, replicas = config()
     if replicas != n or len(running_pods()) != n:
         print(f"Skalerer op til {n} pods ...")
@@ -290,8 +252,8 @@ def ensure_full():
         wait_ready(n)
         wait_for_leader(n - 1)
     if any(s.get("crashed") for s in on_all("/status")):
-        print("Genopliver noder der stadig er crashet fra en tidligere koersel ...")
-        on_all("/recover", "POST")                # no-op paa noder der ikke er crashet
+        print("Genopliver noder der stadig er crashet fra en tidligere kørsel ...")
+        on_all("/recover", "POST")                # ingen effekt på noder der ikke er crashet
         wait_for_leader(n - 1)
     return n
 
@@ -301,13 +263,13 @@ def restore(n):
     kubectl("scale", "statefulset", "bully", f"--replicas={n}")
     wait_ready(n)
     wait_for_leader(n - 1)
-    print("Klar til naeste eksperiment.")
+    print("Klar til næste eksperiment.")
 
 
 def cmd_startup(args):
     deploy(args.algorithm, args.n)
     _, n, _ = config()
-    print("Venter paa opstartsvalget ...")
+    print("Venter på opstartsvalget ...")
     wait_for_leader(n - 1)
     return report("Opstart", expected_leader=n - 1)
 
@@ -316,10 +278,10 @@ def cmd_failover(args):
     n = ensure_full()
     leader = f"bully-{n - 1}"
     on_all("/stats/reset", "POST")
-    print(f"Slaar {leader} ihjel. Alle noder opdager det via heartbeat-timeout ...")
+    print(f"Slår {leader} ihjel. Alle noder opdager det via heartbeat-timeout ...")
     kubectl("scale", "statefulset", "bully", f"--replicas={n - 1}")
     wait_until_dead(leader)
-    wait_for_leader(n - 2)                        # heartbeat_timeout + valget
+    wait_for_leader(n - 2)                        # venter på heartbeat timeout og derefter valget
     row = report("Failover, samtidig opdagelse", expected_leader=n - 2)
     restore(n)
     return row
@@ -331,10 +293,8 @@ def cmd_worst(args):
     leader = f"bully-{n - 1}"
     on_all("/stats/reset", "POST")
 
-    # Node 0 overvaager selv lederen inde fra klyngen og starter valget i samme
-    # oejeblik, lederen holder op med at svare. Det sker inde i poden, saa
-    # kubectl-forsinkelser ikke naar at lade de andre noder ramme deres
-    # heartbeat-timeout foer node 0's ELECTION kommer frem.
+    # node 0 overvåger lederen inde fra poden, så valget startes med det samme, før andre
+    # noder opdager crashet
     watcher_code = (
         "import urllib.request as u, time, sys\n"
         f"t='http://{leader}.bully:8080/status'\n"
@@ -359,37 +319,37 @@ def cmd_worst(args):
     )
     watcher = subprocess.Popen(["kubectl", "exec", "bully-0", "--", "python", "-c", watcher_code],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    # Vent til overvaageren har set lederen svare mindst én gang. Foerst derefter
-    # slaar vi lederen ihjel, saa valget ikke kan blive startet for tidligt.
+    # sikrer mindst 1 svar fra lederen, derefter slås lederen ihjel
+    # sørger for valget ikke bliver startet for tidligt
     first = watcher.stdout.readline().strip()
     if first != "alive":
         rest, err = watcher.communicate(timeout=10)
-        sys.exit(f"Node 0 kunne ikke naa {leader} foer eksperimentet: {first} {rest} {err}".strip())
+        sys.exit(f"Node 0 kunne ikke nå {leader} før eksperimentet: {first} {rest} {err}".strip())
 
-    print(f"Slaar {leader} ihjel og lader node 0 starte valget med det samme ...")
+    print(f"Slår {leader} ihjel og lader node 0 starte valget med det samme ...")
     kubectl("scale", "statefulset", "bully", f"--replicas={n - 1}")
     out, err = watcher.communicate(timeout=90)
     if "triggered" not in out:
-        sys.exit(f"Node 0 naaede ikke at starte valget:\n{err.strip()}")
+        sys.exit(f"Node 0 nåede ikke at starte valget:\n{err.strip()}")
     wait_for_leader(n - 2)
 
     expected = n * (n - 1) if algo == "classic" else 3 * n - 3
     note = None
     if algo == "improved":
-        note = ("Tjek kolonnen 'valg': kun node 0 boer have startet et valg. Har flere noder startet et, "
-                "er det ikke laengere ren vaerste-tilfaelde. Koer i saa fald igen.")
-    row = report("Vaerste tilfaelde, kun node 0 starter", expected, note, expected_leader=n - 2)
+        note = ("Tjek kolonnen 'valg': kun node 0 bør have startet et valg. Har flere noder startet et, "
+                "er det ikke længere ren værste-tilfælde. Kør i så fald igen.")
+    row = report("Værste tilfælde, kun node 0 starter", expected, note, expected_leader=n - 2)
     restore(n)
     return row
 
 
 def cmd_crash_middle(args):
-    """En tilfaeldig ikke-leder doer. Lederen lever, saa der boer ikke komme et valg."""
+    # en vilkårlig node der ikke er coordinator dør, dermed burde der ikke være valg
     n = ensure_full()
     victim = random.randrange(n - 1)
     on_all("/stats/reset", "POST")
     crash(victim)
-    print(f"Venter {HEARTBEAT_TIMEOUT + SETTLE} s (laengere end heartbeat-timeout) ...")
+    print(f"Venter {HEARTBEAT_TIMEOUT + SETTLE} s (længere end heartbeat-timeout) ...")
     time.sleep(HEARTBEAT_TIMEOUT + SETTLE)
     row = report(f"Crash af ikke-leder (node {victim})", expected=0, expected_leader=n - 1)
     recover(victim)
@@ -398,10 +358,10 @@ def cmd_crash_middle(args):
 
 
 def cmd_crash_two(args):
-    """De to hoejeste noder doer samtidig, saa den naeste kandidat ogsaa er doed."""
+    # 2 højeste noder dør på samme tid, så tredjehøjeste node skal være coordinator
     n = ensure_full()
     if n < 3:
-        sys.exit("crash-two kraever mindst 3 noder")
+        sys.exit("crash-two kræver mindst 3 noder")
     on_all("/stats/reset", "POST")
     crash(n - 1, n - 2)
     wait_for_leader(n - 3)
@@ -412,8 +372,8 @@ def cmd_crash_two(args):
 
 
 def cmd_recover_leader(args):
-    """Lederen doer, en ny vaelges, og den gamle leder kommer tilbage og 'bullier' sig til magten.
-    Kun beskederne fra recovery'en maales."""
+    # coordinator dør, ny vælges, og gamle kommer tilbage og starter valg
+    # kun beskederne fra recovery måles
     n = ensure_full()
     crash(n - 1)
     wait_for_leader(n - 2)
@@ -434,11 +394,11 @@ SCENARIOS = {
 
 
 def run_scenario(name, args, out):
-    """Koerer et scenarie args.runs gange og skriver evt. en CSV-raekke pr. koersel."""
+    # kører et scenarie, og skriver evt. en CSV række pr. kørsel
     rows = []
     for run in range(1, args.runs + 1):
         if args.runs > 1:
-            print(f"\n##### {name}: koersel {run}/{args.runs} #####")
+            print(f"\n##### {name}: kørsel {run}/{args.runs} #####")
         row = SCENARIOS[name](args)
         row = {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"), "scenario": name, "run": run, **row}
         rows.append(row)
@@ -448,7 +408,7 @@ def run_scenario(name, args, out):
 
 
 def cmd_sweep(args):
-    """Alle scenarier x begge algoritmer x alle N. Kan tage lang tid (ca. 30-60 s pr. koersel)."""
+    # kører alle scenarier for begge algoritmer og alle n
     out = args.out or RESULTS / f"sweep-{time.strftime('%Y%m%d-%H%M%S')}.csv"
     for algo in args.algorithms:
         for n in args.ns:
@@ -456,14 +416,14 @@ def cmd_sweep(args):
             wait_for_leader(n - 1)
             for name in args.scenarios:
                 run_scenario(name, args, out)
-    print(f"\nFaerdig. Resultater i {out}")
+    print(f"\nFærdig. Resultater i {out}")
 
 
 def main():
     p = argparse.ArgumentParser(description="Eksperimenter mod Bully-poddene i Kubernetes")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--runs", type=int, default=1, help="gentag scenariet R gange")
-    common.add_argument("--out", type=Path, help="CSV-fil der tilfoejes en raekke pr. koersel")
+    common.add_argument("--out", type=Path, help="CSV-fil der tilføjes en række pr. kørsel")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     sub.add_parser("reset")
@@ -486,7 +446,7 @@ def main():
     elif args.cmd == "deploy":
         deploy(args.algorithm, args.n)
     elif args.cmd == "sweep":
-        # startup skal genbruge den algoritme/N som sweep lige har deployet
+        # startup skal genbruge den algoritme og det n, som sweep netop har brugt
         args.algorithm = args.n = None
         cmd_sweep(args)
     else:
