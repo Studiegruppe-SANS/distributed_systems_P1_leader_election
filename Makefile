@@ -60,3 +60,22 @@ plots:
 
 kind-down:
 	kind delete cluster --name $(CLUSTER)
+
+# fortune cookie hjemmesiden (P1 Kubernetes)
+#   make web-deploy                    opret web-servicen, siden kører på http://localhost:30080
+#   make loadtest                      load test -> results/loadtest-*.csv
+#   make failover MODE=delete          slet leder-poden og mål failover -> results/failover-*.csv
+MODE        ?= delete
+LT_REQUESTS ?= 2000
+LT_CONC     ?= 20
+
+.PHONY: web-deploy loadtest failover
+
+web-deploy:
+	kubectl apply -f docker/k8s/web-service.yaml
+
+loadtest:
+	$(PYTHON) docker/loadtest.py --requests $(LT_REQUESTS) --concurrency $(LT_CONC)
+
+failover:
+	$(PYTHON) docker/failover_test.py --mode $(MODE)

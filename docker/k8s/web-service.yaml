@@ -1,0 +1,16 @@
+# almindelig service til brugerne af fortune cookie hjemmesiden
+# sender kun trafik til pods der er Ready. Med readinessProbe på /leader er det kun lederen
+# NodePort 30080 åbnes på localhost via extraPortMappings i kind-cluster.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bully-web
+spec:
+  type: NodePort
+  selector:
+    app: bully
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      nodePort: 30080

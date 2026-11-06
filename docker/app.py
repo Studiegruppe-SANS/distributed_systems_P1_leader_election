@@ -3,8 +3,10 @@
 
 import asyncio
 import os
+import random
 import socket
 import time
+from pathlib import Path
 from typing import Optional
 
 from aiohttp import ClientSession, ClientTimeout, web
@@ -26,6 +28,11 @@ TICK_INTERVAL = 0.1
 # adresse på andre noder, muligt at overwrite ved lokale tests
 PEER_URL = os.environ.get("PEER_URL_TEMPLATE", "http://{service}-{id}.{service}:{port}")
 
+# fortune cookie hjemmesiden, statiske filer og cookies ligger ved siden af app.py
+HERE = Path(__file__).resolve().parent
+STATIC_DIR = HERE / "static"
+FORTUNES_FILE = Path(os.environ.get("FORTUNES_FILE", HERE / "fortunes.txt"))
+
 
 def get_node_id() -> int:
     # til lokal test
@@ -44,6 +51,24 @@ def log(text: str) -> None:
 
 def peer_url(node_id: int) -> str:
     return PEER_URL.format(service=SERVICE, id=node_id, port=PORT)
+
+
+def load_fortunes(path: Path) -> list[str]:
+    # en cookie pr. linje, anførselstegn og komma i enden fjernes: ”Tekst.”, -> Tekst.
+    fortunes = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as e:
+        log(f"Node {NODE_ID}: kunne ikke læse {path} ({e})")
+        lines = []
+    for line in lines:
+        text = line.strip().rstrip(",").strip().strip('"“”').strip()
+        if text:
+            fortunes.append(text)
+    return fortunes or ["No fortunes today. Try again tomorrow."]
+
+
+FORTUNES = load_fortunes(FORTUNES_FILE)
 
 
 # udgående beskeder
@@ -174,6 +199,35 @@ async def handle_recover(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+# fortune cookie hjemmesiden. Kun lederen udleverer cookies,
+# followers svarer 503, så readiness-proben på /leader holder dem ude af web-servicen
+def is_leader(rt: Runtime) -> bool:
+    return not rt.crashed and rt.node.is_coordinator
+
+
+async def handle_leader(request: web.Request) -> web.Response:
+    # bruges af readinessProbe: 200 hvis poden er leder, ellers 503
+    rt: Runtime = request.app["rt"]
+    leader = is_leader(rt)
+    return web.json_response({"id": NODE_ID, "leader": leader, "coordinator": rt.node.coordinator_id},
+                             status=200 if leader else 503)
+
+
+async def handle_cookie(request: web.Request) -> web.Response:
+    rt: Runtime = request.app["rt"]
+    headers = {"Cache-Control": "no-store"}
+    if not is_leader(rt):
+        return web.json_response({"error": "not leader", "served_by": NODE_ID,
+                                  "coordinator": rt.node.coordinator_id},
+                                 status=503, headers=headers)
+    return web.json_response({"fortune": random.choice(FORTUNES), "served_by": NODE_ID,
+                              "pod": socket.gethostname()}, headers=headers)
+
+
+async def handle_index(request: web.Request) -> web.FileResponse:
+    return web.FileResponse(STATIC_DIR / "index.html")
+
+
 # opstart og tick()
 async def tick_loop(rt: Runtime) -> None:
     # delay giver de andre noder tid til at starte op
@@ -209,6 +263,13 @@ def main() -> None:
         web.post("/election", handle_start_election),
         web.post("/crash", handle_crash),
         web.post("/recover", handle_recover),
+    ])
+    # fortune cookie hjemmesiden
+    app.add_routes([
+        web.get("/", handle_index),
+        web.get("/leader", handle_leader),
+        web.get("/api/cookie", handle_cookie),
+        web.static("/static", STATIC_DIR),
     ])
     app.cleanup_ctx.append(lifecycle)
     log(f"Node {NODE_ID} starter ({ALGORITHM}, cluster size {CLUSTER_SIZE}, port {PORT})")
