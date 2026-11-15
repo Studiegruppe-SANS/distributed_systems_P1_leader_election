@@ -72,9 +72,6 @@ Experiments:
 Results:
 - `distributed_systems_P1_leader_election/results`
 
-Report:
-- `distributed_systems_P1_leader_election/project_report/P2_Kubernetes/main.tex`
-
 ## Background
 Much to people's surprise, the fortune cookie is not a Chinese invention, but an American one. Its exact origin is unclear, however, it most likely originated from cookies made by Japanese immigrants to the United States in the late 19th or early 20th century. It is a crisp and sugary cookie wafer with a piece of paper inside, a "fortune", usually an aphorism, or a vague prophecy. It is often served as a dessert in Chinese restaurants in Western countries.
 
@@ -92,17 +89,3 @@ Your report should explain your design decisions and how you have implemented yo
 
 ## References
 [1] Starter code: https://github.com/thecml/bully-in-kubernetes
-
-
-## Running the simulation
-The nodes run in Docker containers, orchestrated with Kubernetes (kind) or Docker Compose. All commands are listed at the top of the `Makefile`.
-
-Fortune cookie website (Project 2):
-```
-make kind-up
-make kind-load
-make deploy ALGO=improved N=5
-make web-deploy          # the website runs on http://localhost:30080
-make loadtest            # load test -> results/loadtest-*.csv
-make failover MODE=delete  # delete the leader pod -> results/failover-*.csv
-```
