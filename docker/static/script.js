@@ -4,7 +4,7 @@
 const fortuneElement = document.getElementById("fortune");
 const metaElement = document.getElementById("meta");
 const button = document.getElementById("more");
-const cookieElelement = document.querySelector(".cookie");
+const cookieElement = document.querySelector(".cookie");
 
 const RETRY_DELAY_MS = 300;
 const GIVE_UP_AFTER_MS = 30000;
@@ -22,7 +22,7 @@ async function fetchCookie() {
 
 async function getCookie() {
   button.disabled = true;
-  cookieElelement.classList.remove("open");
+  cookieElement.classList.remove("open");
   const started = performance.now();
   let attempts = 0;
 
@@ -34,7 +34,7 @@ async function getCookie() {
 
       fortuneElement.classList.remove("error");
       fortuneElement.textContent = data.fortune;
-      cookieElelement.classList.add("open");
+      cookieElement.classList.add("open");
 
       if (attempts > 1) {
         metaElement.textContent = `served by leader ${data.pod} · ${ms} ms · ${attempts - 1} retries during leader election`
