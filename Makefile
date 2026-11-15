@@ -8,8 +8,8 @@
 #   make kind-load                     byg + indlæs imaget i kind (efter hver kodeændring)
 #   make deploy ALGO=classic N=5       (gen)start poddene i Kubernetes
 #   make status                        vis tilstand og beskedtal
-#   make experiments                   fuld sammenligning -> results/sweep-*.csv
-#   make plots                         grafer fra seneste sweep -> results/plots/
+#   make experiments                   fuld sammenligning -> results/leader_election/sweep-*.csv
+#   make plots                         grafer fra seneste sweep -> results/leader_election/plots/
 #   make kind-down                     slet klyngen
 
 ALGO    ?= classic
@@ -60,3 +60,21 @@ plots:
 
 kind-down:
 	kind delete cluster --name $(CLUSTER)
+
+# fortune cookie hjemmesiden (P1 Kubernetes)
+#   make web-deploy                    opret web-servicen, siden kører på http://localhost:30080
+#   make loadtest                      load test -> results/kubernetes/loadtest/
+#   make failover                      fjern leder-poden og mål failover -> results/kubernetes/failover/
+LT_REQUESTS ?= 2000
+LT_CONC     ?= 20
+
+.PHONY: web-deploy loadtest failover
+
+web-deploy:
+	kubectl apply -f docker/k8s/web-service.yaml
+
+loadtest:
+	$(PYTHON) docker/loadtest.py --requests $(LT_REQUESTS) --concurrency $(LT_CONC)
+
+failover:
+	$(PYTHON) docker/failover_test.py

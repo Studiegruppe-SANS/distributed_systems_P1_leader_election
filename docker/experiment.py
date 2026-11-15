@@ -16,7 +16,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 STATEFULSET = HERE / "k8s" / "statefulset.yaml"
-RESULTS = HERE.parent / "results"
+RESULTS = HERE.parent / "results" / "leader_election"
 HEARTBEAT_TIMEOUT = 5  # skal passe med Timeouts.heartbeat_timeout i bully_node.py
 SETTLE = 2             # ekstra tid efter enighed, så de sidste beskeder når at lande
 MAX_WAIT = 90          # maks. ventetid på enighed om ny leder

@@ -28,12 +28,13 @@ spec:
           ports:
             - containerPort: 8080
           # styrer ready kolonnen, når vi inspicerer pods
-          # noderne kan nå hinanden inden en pod er markeret som ready
+          # ready afhænger af lederen. betyder at hver besked bliver sendt til lederen og ikke alle noderne
           readinessProbe:
             httpGet:
-              path: /status
+              path: /leader
               port: 8080
-            periodSeconds: 2
+            periodSeconds: 1
+            failureThreshold: 1
           resources:
             requests:
               cpu: 50m

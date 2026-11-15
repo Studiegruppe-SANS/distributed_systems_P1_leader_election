@@ -10,7 +10,7 @@ matplotlib.use("Agg")                   # ingen GUI, skriver kun til filer
 import matplotlib.pyplot as plt
 import pandas as pd
 
-RESULTS = Path(__file__).resolve().parent.parent / "results"
+RESULTS = Path(__file__).resolve().parent.parent / "results" / "leader_election"
 PLOTS = RESULTS / "plots"
 
 # fast farve pr. algoritme, så classic altid er blå og improved er orange

@@ -14,7 +14,7 @@ Algorithm code files:
 - `distributed_systems_P1_leader_election/docker/app.py`
 
 Results:
-- `distributed_systems_P1_leader_election/results`
+- `distributed_systems_P1_leader_election/results/leader_election`
 
 Testing:
 - `distributed_systems_P1_leader_election/testing/test_bully_node.py`

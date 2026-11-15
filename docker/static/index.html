@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fortune Cookies</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>Fortune Cookies</h1>
+    <p class="subtitle">An infinite supply, served by the elected leader pod</p>
+
+    <div class="cookie" aria-hidden="true">
+      <div class="half left"></div>
+      <div class="half right"></div>
+    </div>
+
+    <blockquote id="fortune" class="fortune" aria-live="polite">Click the button to open a cookie.</blockquote>
+
+    <button id="more" type="button">Get another cookie</button>
+
+    <p id="meta" class="meta">&nbsp;</p>
+  </main>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+:root {
+  --bg: #fdf6ec;
+  --card: #ffffff;
+  --text: #3b2a1a;
+  --muted: #8a7560;
+  --cookie: #e8b04b;
+  --cookie-dark: #c98a2a;
+  --paper: #fffdf7;
+  --accent: #b5442c;
+  --error: #b5442c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.card {
+  width: 100%;
+  max-width: 560px;
+  padding: 32px 24px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(59, 42, 26, 0.12);
+  text-align: center;
+}
+
+h1 { margin: 0 0 4px; font-size: 2rem; }
+
+.subtitle { margin: 0 0 24px; color: var(--muted); font-size: 0.95rem; }
+
+/* cookien tegnes som to halvdele, der skilles ad når en ny cookie åbnes */
+.cookie {
+  position: relative;
+  height: 90px;
+  margin: 0 auto 20px;
+  width: 180px;
+}
+
+.half {
+  position: absolute;
+  top: 0;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle at 40% 35%, var(--cookie), var(--cookie-dark));
+  transition: transform 0.35s ease;
+}
+
+.half.left  { left: 0;  border-radius: 90px 0 0 90px; }
+.half.right { right: 0; border-radius: 0 90px 90px 0; }
+
+.cookie.open .half.left  { transform: translateX(-14px) rotate(-12deg); }
+.cookie.open .half.right { transform: translateX(14px) rotate(12deg); }
+
+.fortune {
+  margin: 0 0 24px;
+  padding: 18px 20px;
+  min-height: 4.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  border: 1px dashed var(--cookie-dark);
+  border-radius: 6px;
+  font-size: 1.2rem;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.fortune.error { color: var(--error); font-style: normal; }
+
+button {
+  padding: 12px 28px;
+  font: inherit;
+  font-size: 1rem;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.1); }
+button:disabled { opacity: 0.6; cursor: wait; }
+
+.meta { margin: 16px 0 0; color: var(--muted); font-size: 0.85rem; font-family: ui-monospace, Menlo, monospace; }

@@ -1,0 +1,3 @@
+timestamp,url,requests,concurrency,ok,failed,wall_s,throughput_rps,min_ms,mean_ms,median_ms,p90_ms,p95_ms,p99_ms,max_ms,served_by
+2026-11-15T16:23:57,http://localhost:30080/api/cookie,2000,20,2000,0,0.616,3249.1,0.35,6.14,1.61,26.34,44.52,52.54,55.72,4
+2026-11-15T16:24:08,http://localhost:30080/api/cookie,20000,50,20000,0,5.593,3576.2,0.33,13.95,3.84,72.35,77.81,80.6,84.36,4

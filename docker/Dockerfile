@@ -7,6 +7,9 @@ WORKDIR /app
 RUN pip install --no-cache-dir aiohttp==3.10.11
 
 COPY bully_node.py improved_bully_node.py app.py ./
+# fortune cookie hjemmesiden
+COPY fortunes.txt ./
+COPY static/ ./static/
 
 # output skrives med det samme, så det kan ses i kubectl logs
 ENV PYTHONUNBUFFERED=1
