@@ -1,0 +1,6 @@
+timestamp,mode,n,old_leader,new_leader,first_fail_s,first_ok_s,first_election_s,election_time_s,outages,failed_requests,requests_after_kill
+2026-11-15T16:24:57,scale,5,4,3,0.086,7.973,3.706,3.067,1,16,569
+2026-11-15T17:02:33,scale,5,4,3,0.117,8.993,5.059,3.037,1,16,557
+2026-11-15T17:04:29,scale,5,4,3,0.112,7.946,4.123,3.058,1,15,574
+2026-11-15T17:06:25,scale,5,4,3,0.175,8.019,4.245,3.04,1,15,573
+2026-11-15T17:08:20,scale,5,4,3,0.133,9.022,4.898,3.058,1,16,556

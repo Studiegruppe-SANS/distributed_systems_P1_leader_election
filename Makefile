@@ -8,8 +8,8 @@
 #   make kind-load                     byg + indlæs imaget i kind (efter hver kodeændring)
 #   make deploy ALGO=classic N=5       (gen)start poddene i Kubernetes
 #   make status                        vis tilstand og beskedtal
-#   make experiments                   fuld sammenligning -> results/sweep-*.csv
-#   make plots                         grafer fra seneste sweep -> results/plots/
+#   make experiments                   fuld sammenligning -> results/leader_election/sweep-*.csv
+#   make plots                         grafer fra seneste sweep -> results/leader_election/plots/
 #   make kind-down                     slet klyngen
 
 ALGO    ?= classic
@@ -63,8 +63,8 @@ kind-down:
 
 # fortune cookie hjemmesiden (P1 Kubernetes)
 #   make web-deploy                    opret web-servicen, siden kører på http://localhost:30080
-#   make loadtest                      load test -> results/loadtest-*.csv
-#   make failover MODE=delete          slet leder-poden og mål failover -> results/failover-*.csv
+#   make loadtest                      load test -> results/kubernetes/loadtest/
+#   make failover MODE=delete          slet leder-poden og mål failover -> results/kubernetes/failover/
 MODE        ?= delete
 LT_REQUESTS ?= 2000
 LT_CONC     ?= 20

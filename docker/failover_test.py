@@ -24,7 +24,7 @@ sys.path.insert(0, str(HERE))
 from experiment import (config, election_time, kubectl, on_all,  # noqa: E402
                         wait_for_leader, wait_ready)
 
-RESULTS = HERE.parent / "results"
+RESULTS = HERE.parent / "results" / "kubernetes" / "failover"
 
 
 def get_cookie(url, timeout):
@@ -190,7 +190,7 @@ def main():
         "failed_requests": failed,
         "requests_after_kill": len(after),
     }
-    write_csv(RESULTS / "failover-summary.csv", [summary], list(summary), append=True)
+    write_csv(RESULTS / "summary.csv", [summary], list(summary), append=True)
     print(f"rå data: {raw}")
 
     if args.mode == "scale":

@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlsplit
 
-RESULTS = Path(__file__).resolve().parent.parent / "results"
+RESULTS = Path(__file__).resolve().parent.parent / "results" / "kubernetes" / "loadtest"
 
 
 class Client:
@@ -139,7 +139,7 @@ def main():
     stamp = time.strftime("%Y%m%d-%H%M%S")
     raw = RESULTS / f"loadtest-{stamp}.csv"
     write_csv(raw, rows, ["i", "t_s", "latency_ms", "status", "served_by", "error"])
-    write_csv(RESULTS / "loadtest-summary.csv", [s], list(s), append=True)
+    write_csv(RESULTS / "summary.csv", [s], list(s), append=True)
 
     print(f"\nOK: {s['ok']}  fejl: {s['failed']}  tid: {s['wall_s']} s  throughput: {s['throughput_rps']} req/s")
     print(f"svartid (ms)  min {s['min_ms']}  mean {s['mean_ms']}  median {s['median_ms']}  "
