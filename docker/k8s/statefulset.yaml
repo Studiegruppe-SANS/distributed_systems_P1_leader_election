@@ -33,7 +33,8 @@ spec:
             httpGet:
               path: /leader
               port: 8080
-            periodSeconds: 2
+            periodSeconds: 1
+            failureThreshold: 1
           resources:
             requests:
               cpu: 50m

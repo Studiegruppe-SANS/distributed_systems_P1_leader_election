@@ -217,9 +217,11 @@ async def handle_cookie(request: web.Request) -> web.Response:
     rt: Runtime = request.app["rt"]
     headers = {"Cache-Control": "no-store"}
     if not is_leader(rt):
-        return web.json_response({"error": "not leader", "served_by": NODE_ID,
-                                  "coordinator": rt.node.coordinator_id},
-                                 status=503, headers=headers)
+        response = web.json_response({"error": "not leader", "served_by": NODE_ID,
+                                "coordinator": rt.node.coordinator_id},
+                                status=503, headers=headers)
+        response.force_close()
+        return response
     return web.json_response({"fortune": random.choice(FORTUNES), "served_by": NODE_ID,
                               "pod": socket.gethostname()}, headers=headers)
 
