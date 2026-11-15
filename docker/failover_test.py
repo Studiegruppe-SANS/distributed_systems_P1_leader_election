@@ -2,10 +2,9 @@
 # en "bruger" henter cookies hvert 50 ms, mens leder-poden slukkes. Måler hvor længe der går,
 # før en ny leder er valgt, og hvor længe brugeren ikke kan få cookies
 #
-#   python3 docker/failover_test.py                 # kubectl delete pod <leder>, StatefulSet genstarter den
-#   python3 docker/failover_test.py --mode scale    # skalerer ned, så lederen IKKE kommer tilbage
+#   python3 docker/failover_test.py    # skalerer StatefulSet ned, så leder-poden forsvinder og ikke kommer tilbage
 #
-# rå målinger -> results/failover-<tid>.csv, opsummering -> results/failover-summary.csv
+# rå målinger -> results/kubernetes/failover/failover-<tid>.csv, opsummering -> results/kubernetes/failover/summary.csv
 
 import argparse
 import csv
@@ -105,8 +104,6 @@ def write_csv(path, rows, fields, append=False):
 def main():
     p = argparse.ArgumentParser(description="Sluk leder-poden og mål failover")
     p.add_argument("--url", default="http://localhost:30080/api/cookie")
-    p.add_argument("--mode", choices=["delete", "scale"], default="delete",
-                   help="delete: kubectl delete pod (kommer tilbage), scale: skaler ned (kommer ikke tilbage)")
     p.add_argument("--interval", type=float, default=0.05, help="sekunder mellem brugerens requests")
     p.add_argument("--timeout", type=float, default=1.0, help="timeout pr. request")
     p.add_argument("--baseline", type=float, default=3.0, help="sekunder med normal drift før nedbrud")
@@ -117,8 +114,9 @@ def main():
     _, status, leader, _ = get_cookie(args.url, args.timeout)
     if status != 200:
         sys.exit(f"Hjemmesiden svarer ikke ({status}) på {args.url}. Kører web-servicen, og er der en leder?")
-    if args.mode == "scale" and leader != n - 1:
-        sys.exit(f"--mode scale fjerner bully-{n - 1}, men lederen er bully-{leader}")
+    # nedskalering fjerner altid bully-(n-1), så den skal være lederen
+    if leader != n - 1:
+        sys.exit(f"nedskalering fjerner bully-{n - 1}, men lederen er bully-{leader}")
     pod = f"bully-{leader}"
 
     on_all("/stats/reset", "POST")
@@ -128,12 +126,8 @@ def main():
     time.sleep(args.baseline)
 
     kill_at = time.time()
-    if args.mode == "delete":
-        print(f"Sletter {pod} (kubectl delete pod) ...")
-        kubectl("delete", "pod", pod, "--wait=false")
-    else:
-        print(f"Skalerer StatefulSet ned til {n - 1}, så {pod} forsvinder ...")
-        kubectl("scale", "statefulset", "bully", f"--replicas={n - 1}")
+    print(f"Skalerer StatefulSet ned til {n - 1}, så {pod} forsvinder ...")
+    kubectl("scale", "statefulset", "bully", f"--replicas={n - 1}")
 
     print(f"Måler i {args.observe} s efter nedbruddet ...")
     time.sleep(args.observe)
@@ -154,7 +148,7 @@ def main():
     ok_lat = [s[3] for s in after if s[1] == 200]
 
     rel = lambda t: f"{t - kill_at:+.2f} s" if t is not None else "-"
-    print(f"\n=== Failover ({args.mode}) af {pod} | CLUSTER_SIZE={n} ===")
+    print(f"\n=== Failover af {pod} | CLUSTER_SIZE={n} ===")
     print(f"requests efter nedbrud: {len(after)}, fejlede: {failed}")
     for i, w in enumerate(windows, 1):
         dur = (w["first_ok"] - w["last_ok_before"]) if w["first_ok"] and w["last_ok_before"] else None
@@ -177,7 +171,6 @@ def main():
     main_window = windows[0] if windows else None
     summary = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "mode": args.mode,
         "n": n,
         "old_leader": leader,
         "new_leader": next(iter(leaders)) if len(leaders) == 1 else None,
@@ -193,11 +186,10 @@ def main():
     write_csv(RESULTS / "summary.csv", [summary], list(summary), append=True)
     print(f"rå data: {raw}")
 
-    if args.mode == "scale":
-        print(f"\nGendanner {n} pods ...")
-        kubectl("scale", "statefulset", "bully", f"--replicas={n}")
-        wait_ready(n)
-        wait_for_leader(n - 1)
+    print(f"\nGendanner {n} pods ...")
+    kubectl("scale", "statefulset", "bully", f"--replicas={n}")
+    wait_ready(n)
+    wait_for_leader(n - 1)
     print("Færdig.")
 
 

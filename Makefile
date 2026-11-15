@@ -64,8 +64,7 @@ kind-down:
 # fortune cookie hjemmesiden (P1 Kubernetes)
 #   make web-deploy                    opret web-servicen, siden kører på http://localhost:30080
 #   make loadtest                      load test -> results/kubernetes/loadtest/
-#   make failover MODE=delete          slet leder-poden og mål failover -> results/kubernetes/failover/
-MODE        ?= delete
+#   make failover                      fjern leder-poden og mål failover -> results/kubernetes/failover/
 LT_REQUESTS ?= 2000
 LT_CONC     ?= 20
 
@@ -78,4 +77,4 @@ loadtest:
 	$(PYTHON) docker/loadtest.py --requests $(LT_REQUESTS) --concurrency $(LT_CONC)
 
 failover:
-	$(PYTHON) docker/failover_test.py --mode $(MODE)
+	$(PYTHON) docker/failover_test.py
